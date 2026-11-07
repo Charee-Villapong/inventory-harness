@@ -23,6 +23,8 @@ tools/
   advance_candidate.py 段階5: 候補の段階遷移
   run_status.py        段階6: 状態集計（未消化セル・段階別件数）
   close_run.py         段階7: 完了チェック付きクローズ
+  run_repo_tests.py    独立tool: 対象リポジトリの pytest 実行と件数集計（JSON出力）
+  pre_push_scan.py     独立tool: 追跡ファイルの個人情報・接続情報・認証情報の混入走査（JSON出力）
 state/runs/<run_id>.json  ランの状態（永続化、.gitignore 対象）
 tests/                 pytest
 ```
@@ -61,6 +63,17 @@ tests/                 pytest
 ```
 
 各 tool は `--config` / `--state-dir` で設定と状態の置き場所を変更できる。
+
+独立 tool 2 本（段階 tool と違い、他 tool を呼ばず引数と JSON 出力だけで連携する）:
+
+```bash
+# 対象リポジトリのテスト実行と件数集計（--cmd でコマンド上書き、--out で JSON 書出）
+.venv/bin/python -m tools.run_repo_tests ~/workspace/github-mirrors/<repo>
+
+# 追跡ファイルの混入走査。ヒット文字列自体は出力せず、種別と場所だけを返す
+# ローカルパターンは scan-patterns.local.json（.gitignore 対象）があれば併用する
+.venv/bin/python -m tools.pre_push_scan ~/workspace/github-mirrors/<repo>
+```
 
 ## 観点（config.json で追加・無効化可能）
 
