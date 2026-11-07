@@ -13,6 +13,7 @@
 ```
 config.json            観点レジストリ・対象設定・除外リスト
 SKILL.md               指揮役（判断の要点と tool の実行順のみ）
+team/                  実行チームと管理チームの役割定義（正本）
 tools/
   common.py            共有の中核（設定読込・対象列挙・状態保存・状態機械）
   discover_targets.py  段階1: 対象の自動列挙
@@ -46,8 +47,13 @@ tests/                 pytest
 .venv/bin/python -m tools.mark_cell monthly-20261201 refactoring skills --result candidates
 .venv/bin/python -m tools.mark_cell monthly-20261201 refactoring fortune --result none
 
-# 候補の段階遷移（不正な飛び越しは拒否される）
+# 候補の段階遷移（証跡必須の遷移は --evidence が要る）
 .venv/bin/python -m tools.advance_candidate monthly-20261201 C-001 --to characterized
+.venv/bin/python -m tools.advance_candidate monthly-20261201 C-001 --to in_progress
+.venv/bin/python -m tools.advance_candidate monthly-20261201 C-001 --to reviewed --evidence "review: <検閲結果への参照>"
+.venv/bin/python -m tools.advance_candidate monthly-20261201 C-001 --to scanned --evidence "scan: <検閲実施記録への参照>"
+.venv/bin/python -m tools.advance_candidate monthly-20261201 C-001 --to pushed --evidence <コミットハッシュ>
+.venv/bin/python -m tools.advance_candidate monthly-20261201 C-001 --to reported --evidence "report: <報告先への参照>"
 
 # 状態集計と完了チェック
 .venv/bin/python -m tools.run_status monthly-20261201
@@ -78,6 +84,35 @@ found -> characterized -> in_progress -> reviewed -> scanned -> pushed -> report
   └─ どの段階からでも decision_pending（判断待ち。元の状態へ復帰可）
   └─ どの段階からでも rejected_as_spec（仕様判断として別件化・終端）
 ```
+
+### 証跡必須の遷移（仕様変更）
+
+実行チームの成果を管理チームが受け取る接点として、次の遷移では
+証跡（成果物への参照）が必須になった。証跡は候補の履歴に
+`{"kind": ..., "ref": ...}` として残る。空・空白のみは拒否される。
+
+| 遷移先 | 必須の証跡 | kind |
+|---|---|---|
+| reviewed | 検閲係の検閲結果への参照 | review |
+| scanned | push 前検閲の実施記録への参照 | scan |
+| pushed | コミットハッシュ（7〜40桁の hex、形式チェックあり） | commit |
+| reported | 報告先への参照 | report |
+
+それ以外の遷移でも `--evidence` で任意の参照を残せる（kind は note）。
+
+後方互換：証跡は履歴への追加のみで、旧形式の state（履歴に証跡を
+持たない候補）はそのまま読み込め、移行は不要。新コードで旧 state の
+候補を通常どおり遷移できることを確認済み。
+
+## チーム構成（二段）
+
+- 管理チーム（ちゃんとやったかを管理する）：取りまとめ・検閲係＋
+  ハーネスの機械的ゲート（マトリクス消化・段階遷移・証跡必須・
+  完了ゲート）
+- 実行チーム（やることを実行する）：調査係・テスト係・実装係・
+  実働テスト係
+
+役割定義は `team/` が正本。係の編成はこの定義から行う。
 
 ## 現在の状態
 
