@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -52,6 +53,22 @@ _TRANSITIONS: dict[str, set[str]] = {
 }
 
 ALL_STATES = frozenset(_TRANSITIONS)
+
+# Transitions that require an evidence reference (spec change: team
+# rollout). The evidence is stored in the candidate history as
+# {"kind": ..., "ref": ...}; kinds name what the reference points at.
+# - reviewed: the independent reviewer's review result
+# - scanned:  the pre-push scan record (the reviewer owns running it)
+# - pushed:   the commit hash itself (format-checked, 7-40 hex chars)
+# - reported: where the report was delivered
+EVIDENCE_KINDS: dict[str, str] = {
+    REVIEWED: "review",
+    SCANNED: "scan",
+    PUSHED: "commit",
+    REPORTED: "report",
+}
+
+_COMMIT_HASH_RE = re.compile(r"^[0-9a-fA-F]{7,40}$")
 
 
 class HarnessError(Exception):
@@ -254,8 +271,33 @@ def allowed_next_states(candidate: dict[str, Any]) -> set[str]:
     return allowed
 
 
+def _validate_evidence(to_state: str, evidence: str | None) -> dict[str, str] | None:
+    """Normalize the evidence for a transition, or refuse the move.
+
+    Returns the {"kind", "ref"} record to store in history, or None
+    when the transition takes no evidence and none was given.
+    """
+    cleaned = evidence.strip() if evidence is not None else ""
+    kind = EVIDENCE_KINDS.get(to_state)
+    if kind is None:
+        if not cleaned:
+            return None
+        return {"kind": "note", "ref": cleaned}
+    if not cleaned:
+        raise HarnessError(
+            f"evidence is required to move to {to_state} "
+            f"({kind} reference); pass --evidence"
+        )
+    if to_state == PUSHED and not _COMMIT_HASH_RE.match(cleaned):
+        raise HarnessError("evidence for pushed must be a commit hash (7-40 hex chars)")
+    return {"kind": kind, "ref": cleaned}
+
+
 def advance_candidate(
-    run: dict[str, Any], candidate_id: str, to_state: str
+    run: dict[str, Any],
+    candidate_id: str,
+    to_state: str,
+    evidence: str | None = None,
 ) -> dict[str, Any]:
     candidate = find_candidate(run, candidate_id)
     if to_state not in ALL_STATES:
@@ -265,13 +307,17 @@ def advance_candidate(
             f"invalid transition: {candidate['state']} -> {to_state} "
             f"(allowed: {sorted(allowed_next_states(candidate))})"
         )
+    evidence_record = _validate_evidence(to_state, evidence)
     previous = candidate["state"]
     if to_state == DECISION_PENDING:
         candidate["pending_from"] = previous
     elif previous == DECISION_PENDING:
         candidate["pending_from"] = None
     candidate["state"] = to_state
-    candidate["history"].append({"from": previous, "to": to_state, "at": utcnow()})
+    entry: dict[str, Any] = {"from": previous, "to": to_state, "at": utcnow()}
+    if evidence_record is not None:
+        entry["evidence"] = evidence_record
+    candidate["history"].append(entry)
     return candidate
 
 
