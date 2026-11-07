@@ -34,7 +34,7 @@ custom-skills が自動列挙され、除外は config の `exclude` のみで�
 | characterized → in_progress | 実装係 | 特性テストを通す実装が進んでいる | — |
 | in_progress → reviewed | — | 検閲が終わっている | 検閲係の検閲結果への参照（**証跡必須**） |
 | reviewed → scanned | — | push 前検閲が終わっている | 検閲実施記録への参照（**証跡必須**） |
-| scanned → pushed | 実装係 | commit／push 済み | コミットハッシュ（**証跡必須**・7〜40桁 hex の形式チェック付き） |
+| scanned → pushed | 取りまとめ／検閲係（段取り） | 検閲通過後に push する。push 前に対象コミットの範囲を確認する（実装係は直接 push しない） | コミットハッシュ（**証跡必須**・7〜40桁 hex の形式チェック付き） |
 | pushed → reported | — | 報告済み | 取りまとめの報告先への参照（**証跡必須**） |
 
 実働確認が必要な候補は、実働テスト係の結果記録が揃うまで
