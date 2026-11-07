@@ -19,8 +19,21 @@ def run_with_candidate(fake_env, capsys):
     return fake_env
 
 
-def _advance(env, to_state):
-    return advance_candidate.main(base_args(env, "r1", "C-001") + ["--to", to_state])
+def _advance(env, to_state, evidence=None):
+    args = base_args(env, "r1", "C-001") + ["--to", to_state]
+    if evidence is not None:
+        args += ["--evidence", evidence]
+    return advance_candidate.main(args)
+
+
+# Evidence references for the gated transitions (reviewed/scanned/
+# pushed/reported), required since the evidence spec change.
+_GATED_EVIDENCE = {
+    "reviewed": "review: ok",
+    "scanned": "scan: clean",
+    "pushed": "0123abc",
+    "reported": "report: chat",
+}
 
 
 def test_happy_path_chain(run_with_candidate, capsys):
@@ -33,7 +46,9 @@ def test_happy_path_chain(run_with_candidate, capsys):
         "pushed",
         "reported",
     ):
-        assert _advance(env, state) == 0, state
+        # Spec change (evidence rollout): gated transitions now need
+        # --evidence; see tests/test_evidence.py.
+        assert _advance(env, state, _GATED_EVIDENCE.get(state)) == 0, state
     capsys.readouterr()
 
 
@@ -59,7 +74,8 @@ def test_decision_pending_detour_and_resume(run_with_candidate, capsys):
     assert _advance(env, "reviewed") == 1
     # ...but can resume to the state it came from.
     assert _advance(env, "in_progress") == 0
-    assert _advance(env, "reviewed") == 0
+    # Spec change (evidence rollout): reviewed now needs --evidence.
+    assert _advance(env, "reviewed", "review: ok") == 0
     capsys.readouterr()
 
 
