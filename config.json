@@ -1,0 +1,41 @@
+{
+  "targets": {
+    "mirrors_dir": "~/workspace/github-mirrors",
+    "extra_targets": [
+      {"name": "custom-skills", "path": "~/workspace/custom-skills"}
+    ],
+    "exclude": ["deadline-ledger"]
+  },
+  "viewpoints": [
+    {
+      "id": "refactoring",
+      "label": "リファクタリング候補",
+      "description": "コードの重複処理・肥大化した関数・変数化されていない直書き値",
+      "enabled": true
+    },
+    {
+      "id": "test-thinness",
+      "label": "テスト薄弱",
+      "description": "テストが薄い箇所と、現状固定テスト（特性テスト）の要否",
+      "enabled": true
+    },
+    {
+      "id": "skill-md-bloat",
+      "label": "SKILL.md肥大化",
+      "description": "コード移行済み手順の残骸・重複するチェック・もう起きないケースの分岐",
+      "enabled": true
+    },
+    {
+      "id": "md-redundancy",
+      "label": "md冗長・不要文言",
+      "description": "SKILL.md以外のmdも含む、冗長な記述・不要文言・重複定義・世代混在",
+      "enabled": true
+    },
+    {
+      "id": "dead-config",
+      "label": "死にキー・効かない設定",
+      "description": "参照されていないconfigキー、読み込まれるが使われていない設定。検出までを行い、処遇（消す／効かせる）は仕様判断として別件に上げる",
+      "enabled": true
+    }
+  ]
+}
