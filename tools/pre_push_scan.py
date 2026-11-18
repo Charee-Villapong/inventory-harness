@@ -120,17 +120,23 @@ def scan_text(text: str, literals: list[str]) -> list[dict[str, Any]]:
 
 
 def list_tracked_files(target: Path) -> list[str]:
-    """Return the repository's tracked files via ``git ls-files``."""
+    """Return the repository's tracked files via ``git ls-files -z``.
+
+    The ``-z`` form is required: without it, git quotes and escapes
+    non-ASCII file names, the quoted names do not resolve to real
+    files, and those files silently fall out of the scan.
+    """
     proc = subprocess.run(
-        ["git", "-C", str(target), "ls-files"],
+        ["git", "-C", str(target), "ls-files", "-z"],
         capture_output=True,
-        text=True,
     )
     if proc.returncode != 0:
-        stderr_lines = (proc.stderr or "").strip().splitlines()
+        stderr = (proc.stderr or b"").decode("utf-8", errors="replace")
+        stderr_lines = stderr.strip().splitlines()
         detail = stderr_lines[-1] if stderr_lines else "unknown git error"
         raise ScanError(f"git ls-files failed: {detail}")
-    return [line for line in proc.stdout.splitlines() if line.strip()]
+    stdout = proc.stdout.decode("utf-8", errors="replace")
+    return [entry for entry in stdout.split("\x00") if entry]
 
 
 class ScanError(Exception):

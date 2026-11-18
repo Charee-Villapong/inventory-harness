@@ -3,16 +3,46 @@
 Fixture-string based: detection, exclusion and literal handling are
 exercised against canned text, with no dependency on a real repository.
 Fixture secrets below are synthetic shapes, not real credentials.
+The git-backed tests at the bottom build throwaway repositories in
+tmp_path; they cover the file enumeration itself.
 """
 
 import json
+import shutil
+import subprocess
+
+import pytest
 
 from tools.pre_push_scan import (
     is_binary,
     is_excluded,
+    list_tracked_files,
     load_local_literals,
+    scan_repo,
     scan_text,
 )
+
+git_required = pytest.mark.skipif(
+    shutil.which("git") is None, reason="git is not available"
+)
+
+
+def _init_repo_with_files(tmp_path, files):
+    """Create a git repo under tmp_path with *files* staged.
+
+    *files* maps relative names to text content. Staging is enough:
+    ``git ls-files`` lists staged files without any commit.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    for name, content in files.items():
+        path = repo / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "add", "--", *files], check=True)
+    return repo
+
 
 CLEAN = "normal source line\nanother harmless line\n"
 
@@ -105,3 +135,23 @@ def test_load_local_literals_missing_or_malformed(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("not json", encoding="utf-8")
     assert load_local_literals(bad) == []
+
+
+@git_required
+def test_list_tracked_files_returns_non_ascii_names_verbatim(tmp_path):
+    name = "資料メモ.txt"
+    repo = _init_repo_with_files(tmp_path, {name: "harmless\n"})
+    assert list_tracked_files(repo) == [name]
+
+
+@git_required
+def test_scan_repo_scans_non_ascii_file_names(tmp_path):
+    name = "資料メモ.txt"
+    # Assembled at runtime so this file itself stays scan-clean.
+    content = "contact: " + "someone" + "@" + "example.com" + "\n"
+    repo = _init_repo_with_files(tmp_path, {name: content})
+    result = scan_repo(repo, [])
+    assert result["error"] is None
+    assert result["files_scanned"] == 1
+    assert result["hits"] == [{"file": name, "line": 1, "kind": "email"}]
+    assert result["ok"] is False
