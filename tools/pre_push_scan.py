@@ -19,7 +19,8 @@ reported as kind ``local_literal``. The file is git-ignored and is
 never created by this tool. ``--patterns PATH`` adds one explicitly.
 
 Excluded from the scan: anything under ``.venv/`` or ``state/``, binary
-files, and the local patterns file itself.
+files, symbolic links (never followed, so files outside the repository
+are never read), and the local patterns file itself.
 
 Usage:
     python -m tools.pre_push_scan TARGET [--patterns PATH]
@@ -185,6 +186,8 @@ def scan_repo(target: Path, literals: list[str]) -> dict[str, Any]:
         if is_excluded(relative):
             continue
         file_path = target / relative
+        if file_path.is_symlink():
+            continue
         try:
             data = file_path.read_bytes()
         except OSError:

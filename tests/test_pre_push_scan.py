@@ -155,3 +155,21 @@ def test_scan_repo_scans_non_ascii_file_names(tmp_path):
     assert result["files_scanned"] == 1
     assert result["hits"] == [{"file": name, "line": 1, "kind": "email"}]
     assert result["ok"] is False
+
+
+@git_required
+def test_scan_repo_does_not_follow_symlinks_out_of_the_repo(tmp_path):
+    # The link target lives outside the repository and carries a
+    # pattern; the scan must never read through the link.
+    outside = tmp_path / "outside.txt"
+    outside.write_text(
+        "contact: " + "someone" + "@" + "example.com" + "\n", encoding="utf-8"
+    )
+    repo = _init_repo_with_files(tmp_path, {"plain.txt": "harmless\n"})
+    (repo / "link.txt").symlink_to(outside)
+    subprocess.run(["git", "-C", str(repo), "add", "--", "link.txt"], check=True)
+    result = scan_repo(repo, [])
+    assert result["error"] is None
+    assert result["files_scanned"] == 1
+    assert result["hits"] == []
+    assert result["ok"] is True
