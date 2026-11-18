@@ -299,6 +299,8 @@ def advance_candidate(
     to_state: str,
     evidence: str | None = None,
 ) -> dict[str, Any]:
+    if run["status"] == "closed":
+        raise HarnessError("run is closed; cannot advance candidates")
     candidate = find_candidate(run, candidate_id)
     if to_state not in ALL_STATES:
         raise HarnessError(f"unknown candidate state: {to_state}")

@@ -92,3 +92,27 @@ def test_common_level_invalid_transition_raises(fake_env):
     candidate = common.add_candidate(run, "refactoring", "repo-a", "t")
     with pytest.raises(common.HarnessError):
         common.advance_candidate(run, candidate["id"], "reported")
+
+
+def test_common_level_advance_on_closed_run_raises(fake_env):
+    config = common.load_config(fake_env.config_path)
+    run = common.new_run(
+        "rx", config.enabled_viewpoints(), common.discover_targets(config)
+    )
+    candidate = common.add_candidate(run, "refactoring", "repo-a", "t")
+    run["status"] = "closed"
+    with pytest.raises(common.HarnessError):
+        common.advance_candidate(run, candidate["id"], "characterized")
+    # The refused move must not have changed the candidate.
+    assert candidate["state"] == "found"
+
+
+def test_advance_on_closed_run_refused_via_cli(run_with_candidate, capsys):
+    env = run_with_candidate
+    store = common.RunStore(env.state_dir)
+    run = store.load("r1")
+    run["status"] = "closed"
+    store.save(run)
+    assert _advance(env, "characterized") == 1
+    out = json.loads(capsys.readouterr().out)
+    assert out["ok"] is False
