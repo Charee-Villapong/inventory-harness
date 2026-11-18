@@ -81,6 +81,20 @@ def test_parse_no_tests_ran_is_abnormal():
     assert is_ok(parsed) is False
 
 
+def test_no_tests_ran_words_outside_summary_do_not_condemn_suite():
+    # A test name and a log line mention the words, but the summary
+    # line reports a normal all-pass run.
+    output = (
+        "tests/test_sample.py::test_no_tests_ran_message PASSED\n"
+        "fixture log: no tests ran\n"
+        "3 passed in 0.10s\n"
+    )
+    parsed = parse_pytest_output(output)
+    assert parsed["error"] is None
+    assert parsed["total"] == 3
+    assert is_ok(parsed) is True
+
+
 def test_parse_missing_summary_is_abnormal():
     parsed = parse_pytest_output(GARBAGE)
     assert parsed["total"] == 0

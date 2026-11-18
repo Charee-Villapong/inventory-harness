@@ -99,7 +99,9 @@ def parse_pytest_output(output: str) -> dict[str, Any]:
     result["total"] = (
         result["passed"] + result["failed"] + result["errors"] + result["skipped"]
     )
-    if "no tests ran" in output or result["total"] == 0:
+    # Only the summary line may declare "no tests ran": the same words
+    # in a test name or a log line must not condemn a passing suite.
+    if "no tests ran" in summary or result["total"] == 0:
         result["error"] = "no tests ran (0 tests collected)"
     return result
 
