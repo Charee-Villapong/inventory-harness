@@ -138,6 +138,23 @@ def discover_targets(config: Config) -> list[dict[str, str]]:
     return [{"name": name, "path": path} for name, path in sorted(found.items())]
 
 
+def _validate_run_id(run_id: str) -> str:
+    """Refuse run ids that could escape the runs directory.
+
+    A run id becomes a file name, so it must be a single plain name:
+    no path separators, no dot segments, never empty.
+    """
+    if (
+        not run_id
+        or run_id in {".", ".."}
+        or "/" in run_id
+        or "\\" in run_id
+        or "\x00" in run_id
+    ):
+        raise HarnessError(f"invalid run id: {run_id!r}")
+    return run_id
+
+
 class RunStore:
     """Persists one JSON file per run under ``<state_dir>/runs/``."""
 
@@ -145,6 +162,7 @@ class RunStore:
         self.runs_dir = state_dir / "runs"
 
     def path_for(self, run_id: str) -> Path:
+        _validate_run_id(run_id)
         return self.runs_dir / f"{run_id}.json"
 
     def save(self, run: dict[str, Any]) -> None:

@@ -1,7 +1,16 @@
 import json
 
+import pytest
+
 from tests.conftest import base_args
-from tools import add_candidate, build_matrix, close_run, mark_cell, run_status
+from tools import (
+    add_candidate,
+    build_matrix,
+    close_run,
+    common,
+    mark_cell,
+    run_status,
+)
 
 
 def _build(env):
@@ -72,9 +81,29 @@ def test_state_survives_reload(fake_env, capsys):
     _drain(capsys)
     # A brand-new store object reading from disk sees the candidate:
     # this is what makes an interrupted run resumable.
-    from tools import common
-
     store = common.RunStore(fake_env.state_dir)
     run = store.load("r1")
     assert run["candidates"][0]["title"] == "x"
     assert run["candidates"][0]["state"] == "found"
+
+
+@pytest.mark.parametrize(
+    "bad_id", ["../evil", "..", ".", "", "a/b", "a\\b", "/abs", "..\\evil"]
+)
+def test_path_for_rejects_escaping_run_ids(fake_env, bad_id):
+    store = common.RunStore(fake_env.state_dir)
+    with pytest.raises(common.HarnessError):
+        store.path_for(bad_id)
+
+
+def test_path_for_accepts_plain_run_ids(fake_env):
+    store = common.RunStore(fake_env.state_dir)
+    path = store.path_for("run-20261118-101500")
+    assert path.parent == store.runs_dir
+    assert path.name == "run-20261118-101500.json"
+
+
+def test_load_rejects_traversal_run_id(fake_env):
+    store = common.RunStore(fake_env.state_dir)
+    with pytest.raises(common.HarnessError):
+        store.load("../../outside/evil")
