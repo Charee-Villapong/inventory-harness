@@ -178,7 +178,10 @@ def run_tests(target: Path, command: str) -> dict[str, Any]:
         result["duration_sec"] = parsed["duration_sec"]
     else:
         result["duration_sec"] = round(elapsed, 3)
-    if result["error"] is None and proc.returncode != 0 and result["total"] == 0:
+    if result["error"] is None and proc.returncode != 0:
+        # A non-zero exit is never a pass, even when the summary line
+        # looks clean (e.g. a session teardown failure after all tests
+        # passed): surface it instead of reporting ok.
         result["error"] = f"test command exited with code {proc.returncode}"
     result["ok"] = is_ok(result)
     return result

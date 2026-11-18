@@ -2,9 +2,13 @@
 
 Fixture-string based: the parser and the ok judgement are exercised
 against canned pytest output, with no dependency on a real repository.
+The run_tests tests at the bottom execute a tiny stand-in script so
+the exit-code handling is covered end to end.
 """
 
-from tools.run_repo_tests import is_ok, parse_pytest_output
+import sys
+
+from tools.run_repo_tests import is_ok, parse_pytest_output, run_tests
 
 ALL_PASS = """\
 ............                                                             [100%]
@@ -125,3 +129,28 @@ def test_skipped_only_is_not_ok_because_error_free_but_check_total():
     assert parsed["error"] is None
     # Nothing failed, but is_ok only requires no failures/errors.
     assert is_ok(parsed) is True
+
+
+def _write_fake_pytest(tmp_path, exit_code):
+    script = tmp_path / "fake_pytest.py"
+    script.write_text(
+        "import sys\n" "print('3 passed in 0.10s')\n" f"sys.exit({exit_code})\n",
+        encoding="utf-8",
+    )
+    return f"{sys.executable} {script}"
+
+
+def test_run_tests_nonzero_exit_is_not_ok_even_when_summary_passes(tmp_path):
+    # All tests "passed" per the summary, but the command exited
+    # non-zero (e.g. teardown failure): the run must not be ok.
+    result = run_tests(tmp_path, _write_fake_pytest(tmp_path, 1))
+    assert result["total"] == 3
+    assert result["error"] == "test command exited with code 1"
+    assert result["ok"] is False
+
+
+def test_run_tests_zero_exit_with_passing_summary_is_ok(tmp_path):
+    result = run_tests(tmp_path, _write_fake_pytest(tmp_path, 0))
+    assert result["total"] == 3
+    assert result["error"] is None
+    assert result["ok"] is True
